@@ -29,13 +29,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
-import org.bukkit.event.world.WorldLoadEvent;
-import org.spigotmc.AsyncCatcher;
 
 import java.net.InetSocketAddress;
 import java.util.UUID;
@@ -97,11 +94,16 @@ public class BukkitEventProcessorInternal implements Listener {
         PacketEvents.get().getServerUtils().entityCache.remove(e.getPlayer().getEntityId());
     }
 
+    // BUG FIX: Removed EntitySpawnEvent handler - it is a Paper-only event and causes
+    // NoClassDefFoundError on Spigot 1.7.10. Entity caching is handled via ChunkLoadEvent
+    // and the entity ID lookup fallback in EntityFinderUtils/ServerUtils.
 
     @EventHandler
-    public void onEntitySpawn(EntitySpawnEvent event) {
-        Entity entity = event.getEntity();
-        PacketEvents.get().getServerUtils().entityCache.putIfAbsent(entity.getEntityId(), entity);
+    public void onChunkLoad(ChunkLoadEvent event) {
+        // Cache entities from loaded chunks as a replacement for EntitySpawnEvent
+        for (Entity entity : event.getChunk().getEntities()) {
+            PacketEvents.get().getServerUtils().entityCache.putIfAbsent(entity.getEntityId(), entity);
+        }
     }
 
     @EventHandler

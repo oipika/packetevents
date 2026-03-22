@@ -38,11 +38,19 @@ public class LateChannelInjectorLegacy implements LateInjector {
 
     @Override
     public void injectPlayer(Player player) {
+        Channel channel = (Channel) PacketEvents.get().getPlayerUtils().getChannel(player);
+        // BUG FIX: null check to prevent NPE when channel hasn't been resolved yet
+        if (channel == null) {
+            return;
+        }
         PlayerChannelHandlerLegacy playerChannelHandlerLegacy = new PlayerChannelHandlerLegacy();
         playerChannelHandlerLegacy.player = player;
-        Channel channel = (Channel) PacketEvents.get().getPlayerUtils().getChannel(player);
         if (channel.getClass().equals(NioSocketChannel.class)) {
-            channel.pipeline().addBefore("packet_handler", PacketEvents.get().getHandlerName(), playerChannelHandlerLegacy);
+            String handlerName = PacketEvents.get().getHandlerName();
+            // BUG FIX: check for existing handler before adding to prevent duplicate handler errors
+            if (channel.pipeline().get(handlerName) == null && channel.pipeline().get("packet_handler") != null) {
+                channel.pipeline().addBefore("packet_handler", handlerName, playerChannelHandlerLegacy);
+            }
         }
     }
 
@@ -61,6 +69,10 @@ public class LateChannelInjectorLegacy implements LateInjector {
     @Override
     public boolean hasInjected(Player player) {
         Channel channel = (Channel) PacketEvents.get().getPlayerUtils().getChannel(player);
+        // BUG FIX: null check to prevent NPE
+        if (channel == null) {
+            return false;
+        }
         return channel.pipeline().get(PacketEvents.get().getHandlerName()) != null;
     }
 

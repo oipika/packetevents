@@ -27,7 +27,7 @@ import java.util.Arrays;
  * @author retrooper
  * @since 1.8
  */
-public class PEVersion {
+public class PEVersion implements Cloneable {
     /**
      * Array containing the digits in the version.
      * For example, "1.8.9" will be stored as {1, 8, 9} in an array.

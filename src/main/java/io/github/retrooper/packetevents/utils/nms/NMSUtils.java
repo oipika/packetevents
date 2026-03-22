@@ -354,8 +354,8 @@ public final class NMSUtils {
             }
         }
         worldSettingsClass = NMSUtils.getNMSClassWithoutException("WorldSettings");
-        if (worldServerClass == null) {
-            worldServerClass = getNMClassWithoutException("world.level.WorldSettings");
+        if (worldSettingsClass == null) {
+            worldSettingsClass = getNMClassWithoutException("world.level.WorldSettings");
         }
         enumHandClass = getNMSEnumClassWithoutException("EnumHand");
         if (enumHandClass == null) {

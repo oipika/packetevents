@@ -132,6 +132,7 @@ public abstract class ListWrapper implements List {
 
     @Override
     public void add(int index, Object element) {
+        processAdd(element);
         synchronized (this) {
             this.list.add(index, element);
         }

@@ -31,7 +31,6 @@ import io.github.retrooper.packetevents.packetwrappers.play.out.entityequipment.
 import io.github.retrooper.packetevents.processor.BukkitEventProcessorInternal;
 import io.github.retrooper.packetevents.processor.PacketProcessorInternal;
 import io.github.retrooper.packetevents.settings.PacketEventsSettings;
-import io.github.retrooper.packetevents.updatechecker.UpdateChecker;
 import io.github.retrooper.packetevents.utils.entityfinder.EntityFinderUtils;
 import io.github.retrooper.packetevents.utils.guava.GuavaUtils;
 import io.github.retrooper.packetevents.utils.netty.bytebuf.ByteBufUtil;
@@ -43,8 +42,6 @@ import io.github.retrooper.packetevents.utils.server.ServerUtils;
 import io.github.retrooper.packetevents.utils.server.ServerVersion;
 import io.github.retrooper.packetevents.utils.version.PEVersion;
 import org.bukkit.Bukkit;
-import org.bukkit.World;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -57,7 +54,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class PacketEvents implements Listener, EventManager {
     private static PacketEvents instance;
     private static Plugin plugin;
-    private final PEVersion version = new PEVersion(1, 8, 4);
+    private final PEVersion version = new PEVersion(1, 8, 5);
     private final EventManager eventManager = new PEEventManager();
     private final PlayerUtils playerUtils = new PlayerUtils();
     private final ServerUtils serverUtils = new ServerUtils();
@@ -68,9 +65,10 @@ public final class PacketEvents implements Listener, EventManager {
     private String handlerName;
     private PacketEventsSettings settings = new PacketEventsSettings();
     private ByteBufUtil byteBufUtil;
-    private UpdateChecker updateChecker;
+    // BUG FIX: both loading and loaded must be volatile for cross-thread visibility
     private volatile boolean loading, loaded;
-    private boolean initialized, initializing, terminating;
+    // BUG FIX: initialized, initializing, terminating should be volatile for thread safety
+    private volatile boolean initialized, initializing, terminating;
     private boolean lateBind = false;
 
     public static PacketEvents create(final Plugin plugin) {
@@ -145,7 +143,6 @@ public final class PacketEvents implements Listener, EventManager {
             }
 
             byteBufUtil = NMSUtils.legacyNettyImportMode ? new ByteBufUtil_7() : new ByteBufUtil_8();
-            updateChecker = new UpdateChecker();
             if (!injectorReady.get()) {
                 injector.load();
                 lateBind = !injector.isBound();
@@ -187,10 +184,6 @@ public final class PacketEvents implements Listener, EventManager {
             settings = packetEventsSettings;
             settings.lock();
 
-            if (settings.shouldCheckForUpdates()) {
-                handleUpdateCheck();
-            }
-
             if (settings.isbStatsEnabled()) {
                 Metrics metrics = new Metrics((JavaPlugin) getPlugin(), 11327);
                 //Just to have an idea what versions of packetevents people use
@@ -201,8 +194,9 @@ public final class PacketEvents implements Listener, EventManager {
 
             //We must wait for the injector to initialize.
 
-            //Wait for the injector to be ready.
+            // BUG FIX: replaced CPU-burning spin-lock with Thread.yield() to avoid burning a core
             while (!injectorReady.get()) {
+                Thread.yield();
             }
 
             Runnable postInjectTask = () -> {
@@ -242,9 +236,18 @@ public final class PacketEvents implements Listener, EventManager {
 
     public void terminate() {
         if (initialized && !terminating) {
+            // BUG FIX: set terminating = true at the START to prevent re-entrant calls
+            terminating = true;
             //Eject all players
             for (Player p : Bukkit.getOnlinePlayers()) {
-                injector.ejectPlayer(p);
+                try {
+                    injector.ejectPlayer(p);
+                } catch (Exception ex) {
+                    // BUG FIX: Don't let one player's ejection failure prevent others from being ejected
+                    if (plugin != null) {
+                        plugin.getLogger().warning("[packetevents] Failed to eject player " + p.getName());
+                    }
+                }
             }
             //Eject the injector if needed
             injector.eject();
@@ -328,45 +331,6 @@ public final class PacketEvents implements Listener, EventManager {
 
     public ByteBufUtil getByteBufUtil() {
         return byteBufUtil;
-    }
-
-    public UpdateChecker getUpdateChecker() {
-        return updateChecker;
-    }
-
-    private void handleUpdateCheck() {
-        if (updateChecker == null) {
-            updateChecker = new UpdateChecker();
-        }
-        Thread thread = new Thread(() -> {
-            getPlugin().getLogger().info("[packetevents] Checking for an update, please wait...");
-            UpdateChecker.UpdateCheckerStatus status = updateChecker.checkForUpdate();
-            int seconds = 5;
-            int retryCount = 5;
-            for (int i = 0; i < retryCount; i++) {
-                if (status != UpdateChecker.UpdateCheckerStatus.FAILED) {
-                    break;
-                }
-                getPlugin().getLogger().severe("[packetevents] Checking for an update again in " + seconds + " seconds...");
-                try {
-                    Thread.sleep(seconds * 1000L);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                seconds *= 2;
-
-                status = updateChecker.checkForUpdate();
-
-                if (i == (retryCount - 1)) {
-                    getPlugin().getLogger().severe("[packetevents] PacketEvents failed to check for an update. No longer retrying.");
-                    break;
-                }
-
-            }
-
-        }, "packetevents-update-check-thread");
-        thread.start();
     }
 
 }

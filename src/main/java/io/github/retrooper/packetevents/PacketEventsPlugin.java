@@ -18,14 +18,8 @@
 
 package io.github.retrooper.packetevents;
 
-import io.github.retrooper.packetevents.event.PacketListenerAbstract;
-import io.github.retrooper.packetevents.event.impl.PacketPlayReceiveEvent;
-import io.github.retrooper.packetevents.packettype.PacketType;
-import io.github.retrooper.packetevents.packetwrappers.play.out.setslot.WrappedPacketOutSetSlot;
 import io.github.retrooper.packetevents.settings.PacketEventsSettings;
 import io.github.retrooper.packetevents.utils.server.ServerVersion;
-import org.bukkit.Material;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class PacketEventsPlugin extends JavaPlugin {
@@ -33,26 +27,16 @@ public class PacketEventsPlugin extends JavaPlugin {
     public void onLoad() {
         PacketEventsSettings settings = PacketEvents.create(this).getSettings();
         settings
-                .fallbackServerVersion(ServerVersion.getLatest())
+                .fallbackServerVersion(ServerVersion.v_1_7_10)
                 .compatInjector(false)
-                .checkForUpdates(true)
                 .bStats(true);
-        PacketEvents.get().loadAsyncNewThread();
-        //You can do something here as it is loading
+        // BUG FIX: Load synchronously instead of async to avoid race conditions
+        // The old loadAsyncNewThread() could cause init() to run before load() finishes
+        PacketEvents.get().load();
     }
 
     @Override
     public void onEnable() {
-        /*PacketEvents.get().getEventManager().registerListener(new PacketListenerAbstract() {
-            @Override
-            public void onPacketPlayReceive(PacketPlayReceiveEvent event) {
-                if (event.getPacketId() == PacketType.Play.Client.USE_ENTITY) {
-                    ItemStack stack = new ItemStack(Material.STICK);
-                    WrappedPacketOutSetSlot setSlot = new WrappedPacketOutSetSlot(0, 2, stack);
-                    PacketEvents.get().getPlayerUtils().sendPacket(event.getPlayer(), setSlot);
-                }
-            }
-        });*/
         PacketEvents.get().init();
     }
 

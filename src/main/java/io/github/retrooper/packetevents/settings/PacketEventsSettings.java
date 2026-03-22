@@ -31,12 +31,6 @@ public class PacketEventsSettings {
     private ServerVersion fallbackServerVersion = ServerVersion.v_1_7_10;
 
     /**
-     * This boolean stores if PacketEvents should check for updates,
-     * and give you a notice in the console.
-     */
-    private boolean checkForUpdates = true;
-
-    /**
      * This boolean stores if PacketEvents should inject a player earlier using the {@code LateInjector}.
      * We also call it the "compatibility injector", because it should actually be compatible with everything.
      * Using this injector prevents us from listening to packets during the early packet-states. (STATUS, HANDSHAKING, LOGIN)
@@ -91,19 +85,6 @@ public class PacketEventsSettings {
     }
 
     /**
-     * This decides if PacketEvents should check for updates and notify when your server starts.
-     *
-     * @param checkForUpdates Value
-     * @return Settings instance.
-     */
-    public PacketEventsSettings checkForUpdates(boolean checkForUpdates) {
-        if (!locked) {
-            this.checkForUpdates = checkForUpdates;
-        }
-        return this;
-    }
-
-    /**
      * This decides if PacketEvents should collect data anonymously and report to bStats.
      *
      * @param bStatsEnabled Value
@@ -133,6 +114,19 @@ public class PacketEventsSettings {
     }
 
     /**
+     * Stub kept for backward compatibility - update checking has been removed.
+     *
+     * @param checkForUpdates Ignored.
+     * @return Settings instance.
+     * @deprecated Update checker has been removed in 1.8.5.
+     */
+    @Deprecated
+    public PacketEventsSettings checkForUpdates(boolean checkForUpdates) {
+        // No-op: update checker removed
+        return this;
+    }
+
+    /**
      * Are the settings locked?
      *
      * @return Is locked.
@@ -145,7 +139,7 @@ public class PacketEventsSettings {
     /**
      * Backup server version.
      *
-     * @return Getter for {@link #backupServerVersion}
+     * @return Getter for {@link #fallbackServerVersion}
      * @deprecated Use {@link #getFallbackServerVersion()}
      */
     @Deprecated
@@ -156,19 +150,21 @@ public class PacketEventsSettings {
     /**
      * Fallback server version.
      *
-     * @return Getter for {@link #backupServerVersion}
+     * @return Getter for {@link #fallbackServerVersion}
      */
     public ServerVersion getFallbackServerVersion() {
         return fallbackServerVersion;
     }
 
     /**
-     * Should we check for updates?
+     * Always returns false - update checking has been removed.
      *
-     * @return Getter for {@link #checkForUpdates}
+     * @return false
+     * @deprecated Update checker has been removed in 1.8.5.
      */
+    @Deprecated
     public boolean shouldCheckForUpdates() {
-        return checkForUpdates;
+        return false;
     }
 
     /**

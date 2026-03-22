@@ -36,10 +36,15 @@ public class PlayerChannelHandlerLegacy extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, Object packet) throws Exception {
-        PacketProcessorInternal.PacketData data = PacketEvents.get().getInternalPacketProcessor().read(player, ctx.channel(), packet);
-        if (data.packet != null) {
-            super.channelRead(ctx, data.packet);
-            PacketEvents.get().getInternalPacketProcessor().postRead(player, ctx.channel(), data.packet);
+        try {
+            PacketProcessorInternal.PacketData data = PacketEvents.get().getInternalPacketProcessor().read(player, ctx.channel(), packet);
+            if (data.packet != null) {
+                super.channelRead(ctx, data.packet);
+                PacketEvents.get().getInternalPacketProcessor().postRead(player, ctx.channel(), data.packet);
+            }
+        } catch (Exception ex) {
+            // BUG FIX: Don't let packet processing errors disconnect the player
+            super.channelRead(ctx, packet);
         }
     }
 
@@ -50,15 +55,20 @@ public class PlayerChannelHandlerLegacy extends ChannelDuplexHandler {
             super.write(ctx, packet, promise);
             return;
         }
-        PacketProcessorInternal.PacketData data = PacketEvents.get().getInternalPacketProcessor().write(player, ctx.channel(), packet);
-        if (data.postAction != null) {
-            promise.addListener(f -> {
-                data.postAction.run();
-            });
-        }
-        if (data.packet != null) {
-            super.write(ctx, data.packet, promise);
-            PacketEvents.get().getInternalPacketProcessor().postWrite(player, ctx.channel(), data.packet);
+        try {
+            PacketProcessorInternal.PacketData data = PacketEvents.get().getInternalPacketProcessor().write(player, ctx.channel(), packet);
+            if (data.postAction != null) {
+                promise.addListener(f -> {
+                    data.postAction.run();
+                });
+            }
+            if (data.packet != null) {
+                super.write(ctx, data.packet, promise);
+                PacketEvents.get().getInternalPacketProcessor().postWrite(player, ctx.channel(), data.packet);
+            }
+        } catch (Exception ex) {
+            // BUG FIX: Don't let packet processing errors disconnect the player
+            super.write(ctx, packet, promise);
         }
     }
 }
