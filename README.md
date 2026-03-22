@@ -3,7 +3,7 @@
 [![](https://img.shields.io/badge/License-GPLv3-yellow.svg)](https://github.com/retrooper/packetevents/blob/dev/LICENSE)
 [![](https://jitpack.io/v/retrooper/packetevents.svg)](https://jitpack.io/#retrooper/packetevents)
 
-PacketEvents is a powerful packet library. Our packet wrappers are efficient and easy to use. We support many protocol versions. (1.8+)
+PacketEvents is a powerful packet library. Our packet wrappers are efficient and easy to use. We support many protocol versions. This is a fork of packetevents 1.8.4 which is the last official version of packetevents 1.x, this fork aims to bring a stable packet library for 1.7.10.
 
 ### Resources
 * [SpigotMC](https://www.spigotmc.org/resources/packetevents-api.80279/)

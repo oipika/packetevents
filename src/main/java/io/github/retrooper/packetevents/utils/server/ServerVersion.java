@@ -46,8 +46,27 @@ public enum ServerVersion {
     v_1_18(757), v_1_18_1(757), v_1_18_2(758),
     ERROR(-1);
 
-    private static final String NMS_VERSION_SUFFIX = Bukkit.getServer().getClass().getPackage().getName()
-            .replace(".", ",").split(",")[3];
+    // BUG FIX: kSpigot and other custom forks use unversioned packages
+    // (e.g. "org.bukkit.craftbukkit" instead of "org.bukkit.craftbukkit.v1_7_R4")
+    // The old code did split(",")[3] which would ArrayIndexOutOfBoundsException on these.
+    // We now gracefully handle this by returning empty string for unversioned servers.
+    private static final String NMS_VERSION_SUFFIX;
+
+    static {
+        String suffix = "";
+        try {
+            String[] parts = Bukkit.getServer().getClass().getPackage().getName().split("\\.");
+            // Standard Spigot: org.bukkit.craftbukkit.v1_7_R4 -> 4 parts, suffix at [3]
+            // kSpigot/Misc:  org.bukkit.craftbukkit -> 3 parts, no suffix
+            if (parts.length > 3) {
+                suffix = parts[3];
+            }
+        } catch (Exception e) {
+            // If anything goes wrong, leave it empty
+        }
+        NMS_VERSION_SUFFIX = suffix;
+    }
+
     private static final ServerVersion[] VALUES = values();
     public static ServerVersion[] reversedValues = new ServerVersion[VALUES.length];
     private static ServerVersion cachedVersion;
@@ -119,15 +138,34 @@ public enum ServerVersion {
         return NMS_VERSION_SUFFIX;
     }
 
+    /**
+     * BUG FIX: For unversioned servers, the NMS directory is just
+     * "net.minecraft.server" with no suffix. For standard Spigot, it is
+     * "net.minecraft.server.v1_7_R4".
+     */
     public static String getNMSDirectory() {
-        return "net.minecraft.server." + getNMSSuffix();
+        if (NMS_VERSION_SUFFIX.isEmpty()) {
+            return "net.minecraft.server";
+        }
+        return "net.minecraft.server." + NMS_VERSION_SUFFIX;
     }
 
+    /**
+     * BUG FIX: For unversioned servers, the OBC directory is just
+     * "org.bukkit.craftbukkit" with no suffix. For standard Spigot, it is
+     * "org.bukkit.craftbukkit.v1_7_R4".
+     */
     public static String getOBCDirectory() {
-        return "org.bukkit.craftbukkit." + (getNMSSuffix());
+        if (NMS_VERSION_SUFFIX.isEmpty()) {
+            return "org.bukkit.craftbukkit";
+        }
+        return "org.bukkit.craftbukkit." + NMS_VERSION_SUFFIX;
     }
 
     public static ServerVersion getLatest() {
+        if (reversedValues[0] == null) {
+            reversedValues = ServerVersion.reverse();
+        }
         return reversedValues[0];
     }
 
@@ -153,23 +191,10 @@ public enum ServerVersion {
      * @return Is this server version newer than the compared server version.
      */
     public boolean isNewerThan(ServerVersion target) {
-        /*
-         * Some server versions have the same protocol version in the minecraft protocol.
-         * We still need this method to work in such cases.
-         * We first check if this is the case, if the protocol versions aren't the same, we can just use the protocol versions
-         * to compare the server versions.
-         */
         if (target.protocolVersion != protocolVersion || this == target) {
             return protocolVersion > target.protocolVersion;
         }
 
-        /*
-         * The server versions unfortunately have the same protocol version.
-         * We need to look at this "reversedValues" variable.
-         * The reversed values variable is an array containing all enum constants in this enum but in a reversed order.
-         * I already made this variable a while ago for a different usage, you can check that out.
-         * The first one we find in the array is the newer version.
-         */
         for (ServerVersion version : reversedValues) {
             if (version == target) {
                 return false;
@@ -182,27 +207,14 @@ public enum ServerVersion {
 
     /**
      * Is this server version older than the compared server version?
-     * This method simply checks if this server version's protocol version is less than
-     * the compared server version's protocol version.
      *
      * @param target Compared server version.
      * @return Is this server version older than the compared server version.
      */
     public boolean isOlderThan(ServerVersion target) {
-        /*
-         * Some server versions have the same protocol version in the minecraft protocol.
-         * We still need this method to work in such cases.
-         * We first check if this is the case, if the protocol versions aren't the same, we can just use the protocol versions
-         * to compare the server versions.
-         */
         if (target.protocolVersion != protocolVersion || this == target) {
             return protocolVersion < target.protocolVersion;
         }
-        /*
-         * The server versions unfortunately have the same protocol version.
-         * We look at all enum constants in the ServerVersion enum in the order they have been defined in.
-         * The first one we find in the array is the newer version.
-         */
         for (ServerVersion version : VALUES) {
             if (version == this) {
                 return true;
@@ -213,73 +225,29 @@ public enum ServerVersion {
         return false;
     }
 
-    /**
-     * Is this server version newer than or equal to the compared server version?
-     * This method simply checks if this server version's protocol version is greater than or equal to
-     * the compared server version's protocol version.
-     *
-     * @param target Compared server version.
-     * @return Is this server version newer than or equal to the compared server version.
-     */
     public boolean isNewerThanOrEquals(ServerVersion target) {
         return this == target || isNewerThan(target);
     }
 
-    /**
-     * Is this server version older than or equal to the compared server version?
-     * This method simply checks if this server version's protocol version is older than or equal to
-     * the compared server version's protocol version.
-     *
-     * @param target Compared server version.
-     * @return Is this server version older than or equal to the compared server version.
-     */
     public boolean isOlderThanOrEquals(ServerVersion target) {
         return this == target || isOlderThan(target);
     }
 
-    /**
-     * Deprecated, please use {@link #isNewerThan(ServerVersion)}
-     *
-     * @param target Compared version.
-     * @return Is this server version newer than the compared server version.
-     * @deprecated Rename...
-     **/
     @Deprecated
     public boolean isHigherThan(final ServerVersion target) {
         return isNewerThan(target);
     }
 
-    /**
-     * Deprecated, Please use {@link #isNewerThanOrEquals(ServerVersion)}
-     *
-     * @param target Compared server version.
-     * @return Is this server version newer than or equal to the compared server version.
-     * @deprecated Rename...
-     */
     @Deprecated
     public boolean isHigherThanOrEquals(final ServerVersion target) {
         return isNewerThanOrEquals(target);
     }
 
-    /**
-     * Deprecated... Please use {@link #isOlderThan(ServerVersion)}
-     *
-     * @param target Compared server version.
-     * @return Is this server version older than the compared server version.
-     * @deprecated Rename....
-     */
     @Deprecated
     public boolean isLowerThan(final ServerVersion target) {
         return isOlderThan(target);
     }
 
-    /**
-     * Deprecated, please use {@link #isOlderThanOrEquals(ServerVersion)}
-     *
-     * @param target Compared server version.
-     * @return Is this server version older than or equal to the compared server version.
-     * @deprecated Rename...
-     */
     @Deprecated
     public boolean isLowerThanOrEquals(final ServerVersion target) {
         return isOlderThanOrEquals(target);

@@ -572,7 +572,7 @@ public final class NMSUtils {
             try {
                 List<?> list = (List<?>) serverConnectionWrapper.readObject(i, List.class);
                 for (Object obj : list) {
-                    if (obj.getClass().isAssignableFrom(networkManagerClass)) {
+                    if (networkManagerClass.isAssignableFrom(obj.getClass())) {
                         return (List<Object>) list;
                     }
                 }
